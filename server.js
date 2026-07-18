@@ -1,0 +1,116 @@
+// Prompt Studio — Render 後端(全新獨立專案,與 TT2 relay 無關)
+// 功能:1) Lemon Squeezy 授權碼驗證  2) 驗證通過後呼叫 Claude API 產生強化 Prompt
+// 環境變數:
+//   ANTHROPIC_API_KEY   必填,你的 Anthropic API key
+//   ALLOWED_ORIGIN      前端網址,例如 https://stevenmusic.github.io
+//   CLAUDE_MODEL        選填,預設 claude-haiku-4-5-20251001(想升級品質可改 claude-sonnet-4-6)
+//   LS_STORE_ID         選填,Lemon Squeezy store id(加一層驗證,防止別家店的 key)
+//   DEMO_LICENSE        選填,測試用授權碼(上線後刪掉)
+
+const express = require("express");
+const Anthropic = require("@anthropic-ai/sdk");
+
+const app = express();
+app.use(express.json({ limit: "50kb" }));
+
+// ---------- CORS ----------
+const ORIGIN = process.env.ALLOWED_ORIGIN || "*";
+app.use((req, res, next) => {
+  res.setHeader("Access-Control-Allow-Origin", ORIGIN);
+  res.setHeader("Access-Control-Allow-Methods", "POST, GET, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+  if (req.method === "OPTIONS") return res.sendStatus(204);
+  next();
+});
+
+const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+const MODEL = process.env.CLAUDE_MODEL || "claude-haiku-4-5-20251001";
+
+// ---------- 授權碼驗證(Lemon Squeezy) ----------
+// 驗證結果快取 10 分鐘,減少對 LS 的請求
+const licCache = new Map(); // key -> { valid, exp }
+const CACHE_MS = 10 * 60 * 1000;
+
+async function checkLicense(key) {
+  if (!key || typeof key !== "string" || key.length > 64) return false;
+  if (process.env.DEMO_LICENSE && key === process.env.DEMO_LICENSE) return true;
+
+  const hit = licCache.get(key);
+  if (hit && hit.exp > Date.now()) return hit.valid;
+
+  let valid = false;
+  try {
+    const r = await fetch("https://api.lemonsqueezy.com/v1/licenses/validate", {
+      method: "POST",
+      headers: { Accept: "application/json", "Content-Type": "application/json" },
+      body: JSON.stringify({ license_key: key }),
+    });
+    const j = await r.json();
+    valid = j.valid === true && j.license_key?.status === "active";
+    if (valid && process.env.LS_STORE_ID) {
+      valid = String(j.meta?.store_id) === String(process.env.LS_STORE_ID);
+    }
+  } catch (e) {
+    console.error("LS validate error:", e.message);
+  }
+  licCache.set(key, { valid, exp: Date.now() + CACHE_MS });
+  return valid;
+}
+
+// ---------- 每組授權碼的每日用量限制 ----------
+const usage = new Map(); // key -> { day, count }
+const DAILY_LIMIT = 100;
+function useOnce(key) {
+  const today = new Date().toISOString().slice(0, 10);
+  let u = usage.get(key);
+  if (!u || u.day !== today) { u = { day: today, count: 0 }; usage.set(key, u); }
+  if (u.count >= DAILY_LIMIT) return -1;          // 已達上限
+  u.count++;
+  return DAILY_LIMIT - u.count;                    // 回傳今日剩餘次數
+}
+
+// ---------- Routes ----------
+app.get("/", (req, res) => res.json({ ok: true, service: "prompt-studio" }));
+
+app.post("/api/verify", async (req, res) => {
+  const valid = await checkLicense(req.body?.license);
+  res.json({ valid });
+});
+
+app.post("/api/enhance", async (req, res) => {
+  const { license, brief } = req.body || {};
+  if (!(await checkLicense(license))) return res.status(403).json({ error: "invalid_license" });
+  const remaining = useOnce(license);
+  if (remaining < 0) return res.status(429).json({ error: "daily_limit", remaining: 0 });
+  if (!brief || typeof brief !== "string" || brief.length > 2000)
+    return res.status(400).json({ error: "bad_brief" });
+
+  const lang = req.body.lang === "zh" ? "Traditional Chinese" : "English";
+  const system =
+    `You are an expert AI-music prompt engineer for Suno and Udio. ` +
+    `Given the brief, write professional prompts. Respond ONLY with raw JSON, no markdown fences, ` +
+    `exactly: {"suno":"...","udio":"...","negative":"...","description":"..."} . ` +
+    `suno: rich comma-separated style prompt under 120 words with production details (mix, dynamics, structure hints). ` +
+    `udio: concise tag-style prompt under 40 words. negative: things to avoid. ` +
+    `description: 2-3 sentence song description in ${lang}.`;
+
+  try {
+    const msg = await anthropic.messages.create({
+      model: MODEL,
+      max_tokens: 1000,
+      system,
+      messages: [{ role: "user", content: brief }],
+    });
+    const txt = msg.content.map(c => c.text || "").join("").replace(/```json|```/g, "").trim();
+    const data = JSON.parse(txt);
+    if (!data.suno || !data.udio) throw new Error("bad shape");
+    data.remaining = remaining;
+    res.json(data);
+  } catch (e) {
+    console.error("enhance error:", e.message);
+    res.status(500).json({ error: "enhance_failed" });
+  }
+});
+
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => console.log("Prompt Studio server on :" + PORT));
