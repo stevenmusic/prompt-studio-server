@@ -1,14 +1,13 @@
 // Prompt Studio — Render 後端(全新獨立專案,與 TT2 relay 無關)
 // 功能:1) Lemon Squeezy 授權碼驗證  2) 驗證通過後呼叫 Claude API 產生強化 Prompt
 // 環境變數:
-//   ANTHROPIC_API_KEY   必填,你的 Anthropic API key
+//   OPENAI_API_KEY      必填,你的 OpenAI API key
 //   ALLOWED_ORIGIN      前端網址,例如 https://stevenmusic.github.io
-//   CLAUDE_MODEL        選填,預設 claude-haiku-4-5-20251001(想升級品質可改 claude-sonnet-4-6)
+//   OPENAI_MODEL        選填,預設 gpt-5.4-mini(若報錯 model not found,到 platform.openai.com/docs/models 查你帳號可用的正確 ID 後填入)
 //   LS_STORE_ID         選填,Lemon Squeezy store id(加一層驗證,防止別家店的 key)
 //   DEMO_LICENSE        選填,測試用授權碼(上線後刪掉)
 
 const express = require("express");
-const Anthropic = require("@anthropic-ai/sdk");
 
 const app = express();
 app.use(express.json({ limit: "50kb" }));
@@ -23,8 +22,7 @@ app.use((req, res, next) => {
   next();
 });
 
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-const MODEL = process.env.CLAUDE_MODEL || "claude-haiku-4-5-20251001";
+const MODEL = process.env.OPENAI_MODEL || "gpt-5.4-mini";
 
 // ---------- 授權碼驗證(Lemon Squeezy) ----------
 // 驗證結果快取 10 分鐘,減少對 LS 的請求
@@ -95,13 +93,25 @@ app.post("/api/enhance", async (req, res) => {
     `description: 2-3 sentence song description in ${lang}.`;
 
   try {
-    const msg = await anthropic.messages.create({
-      model: MODEL,
-      max_tokens: 1000,
-      system,
-      messages: [{ role: "user", content: brief }],
+    const r = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: "Bearer " + process.env.OPENAI_API_KEY,
+      },
+      body: JSON.stringify({
+        model: MODEL,
+        max_completion_tokens: 1000,
+        response_format: { type: "json_object" },
+        messages: [
+          { role: "system", content: system },
+          { role: "user", content: brief },
+        ],
+      }),
     });
-    const txt = msg.content.map(c => c.text || "").join("").replace(/```json|```/g, "").trim();
+    const j = await r.json();
+    if (j.error) throw new Error(j.error.message || "openai_error");
+    const txt = (j.choices?.[0]?.message?.content || "").replace(/```json|```/g, "").trim();
     const data = JSON.parse(txt);
     if (!data.suno || !data.udio) throw new Error("bad shape");
     data.remaining = remaining;
