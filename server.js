@@ -72,14 +72,24 @@ const EXPERT_RULES = [
 "SUNO v5.5 STYLE FIELD CRAFT:",
 "- Open with tempo (BPM) + key suggestion + one primary genre descriptor.",
 "- Name at least 2 instruments, each with a vivid adjective (e.g. 'slightly detuned vintage keys', 'glitchy hi-hat rolls', 'close-mic breathiness') — v5.5 rewards subtle, specific descriptors.",
-"- Use 8-15 tags total, roughly one per category: genre / mood / instrumentation / vocal timbre / production.",
+"- Use 12-25 tags total across categories: genre / mood / instrumentation (each with an adjective) / vocal timbre / production / era. Concise beats cluttered: every tag must earn its place.",
 "- Vocal timbre vocabulary: smoky, airy, bright, warm, raspy, velvety, breathy, powerful belt.",
 "- Production vocabulary: analog warmth, tape saturation, wide stereo image, punchy low end, glued bus compression, tasteful sidechain.",
 "- Put things to AVOID at the very END of the style string as negatives when helpful.",
+"- SUNO v5.5 GRAVITY WELL: niche genres drift back toward standard pop structure unless you explicitly exclude it — for non-pop genres, add pop-drift blockers to the exclude field (e.g. generic pop structure, radio pop sheen) alongside genre-specific exclusions.",
+"- SUNO v5.5 PERSONALIZATION: an explicit style prompt always overrides the user's My Taste defaults, so write the style as the complete authority; never rely on platform defaults to fill gaps. Never reference real artist names — Suno blocks them; describe the sonic traits instead.",
 "- ERA-SENSITIVE GENRES: when a genre entry has an ERA ANCHOR, the style prompt MUST include that era phrase and era-correct production descriptors; copy that entry EXCLUDE items into the exclude output field.",
 "- BRIGHTNESS: for vintage genres, explicitly request airy bright top end / sparkling highs — AI mixes default too dark.",
+"- LYRIC PRECISION: lyrics must embody the genre LYRIC ESSENCE notes (themes, imagery system, rhyme habits, hook style) fused with the language rules — a mandopop lyric and a country lyric on the same theme must be unmistakably different.",
 "- STYLE PRECISION: the style prompt MUST contain at least 2 signature sonic identifiers unique to the genre (drawn from the craft notes) so the model cannot drift generic. BAN vague filler words: high quality, amazing, beautiful, great, epic sound, masterpiece, professional — every word must either name a concrete sound source or shape the mix. Never repeat a descriptor.",
 "- HARD CONSTRAINTS: if the brief specifies Key, Chord progression, Era, Vocal timbre, Production texture or Song structure, treat them as non-negotiable: reflect the key and progression in the style prompt wording, follow the requested structure exactly in the lyrics tags, and weave timbre/texture words into vocal and production descriptors.",
+"PERFORMANCE META-TAGS (local instructions inside the Lyrics field — style prompt is global, meta tags are local):",
+"- Beyond structure tags, deploy performance tags on their own lines where musically justified: [Guitar Solo], [Piano Solo], [Sax Solo], [Instrumental Break], [Build], [Drop], [Break], [Big Finish], [Fade Out], [End].",
+"- Writing a tag in UPPERCASE can strengthen the instruction; use sparingly for the one moment that matters most.",
+"- Parenthetical echoes after a line create background vocals / call-and-response, e.g. a hook line followed by (echo of its last words) — powerful for duets, ad-libs and crowd answers.",
+"- Mixed-language lyrics: write them directly inline in the lyrics; Suno switches pronunciation automatically — never declare code-switching in the style prompt.",
+"- Enunciation is a controllable style descriptor: lazy drawled enunciation, crisp diction, slurred blue notes, breathy consonants — pick one that serves the genre.",
+"- If a clean studio sound is wanted, say it explicitly: clean vocal take, dry recording, studio booth, no crowd noise.",
 "LYRICS FIELD CRAFT (all languages):",
 "- Structure tags on their own lines: [Intro][Verse 1][Pre-Chorus][Chorus][Verse 2][Bridge][Final Chorus][Outro].",
 "- May add delivery tags where musically justified: [Whispered], [Belted], [Spoken], [Harmonies], [Ad-libs].",
@@ -124,12 +134,50 @@ const GENRE_KB = {
   "chinese style": "中國風 fusion; tempo ballad 60-80 / mid 90-105; harmony: pentatonic melodies over modern I-vi-IV-V or minor loops, modal colors (gong/yu modes); instruments: erhu lead lines, guzheng arpeggios and glissandi, dizi and xiao ornaments, pipa tremolo, yangqin shimmer, zhongruan/liuqin plucked mid-range, suona for festive climaxes, blended with modern piano, strings and soft beats; vocal: lyrical Mandarin with classical poetic imagery (ink, moon, plum blossom); production: airy oriental reverb space, delicate dynamics"
 };
 
+
+// 每種曲風:歌詞精髓(取自經典曲目的風格結晶,不含任何歌詞原文)
+const GENRE_LYRIC_KB = {
+  "pop": "LYRIC ESSENCE: one universal emotion per song; title phrase inside the chorus hook; verses give scene, chorus gives feeling; second person address (you) pulls the listener in",
+  "rock": "LYRIC ESSENCE: defiance, escape, small-town restlessness; direct declarative lines; anthem choruses built for crowds to shout back",
+  "hip-hop": "LYRIC ESSENCE: wordplay, internal and multisyllabic rhyme, punchlines every 2-4 bars; origin-story and ambition arcs; specific brand/place details create authenticity",
+  "trap": "LYRIC ESSENCE: flex and pain in the same verse — success shadowed by paranoia and loss; short repeated hook phrases; ad-lib echoes of key words",
+  "r&b": "LYRIC ESSENCE: intimacy and vulnerability at close range; sensory nighttime detail; conversational confessions, late-night phone-call tone",
+  "soul": "LYRIC ESSENCE: love and hardship testified with church conviction; plead, promise, and release; repetition that climbs in intensity",
+  "funk": "LYRIC ESSENCE: party commands and communal chants; the groove itself is the subject; call-and-response between lead and gang vocals",
+  "disco": "LYRIC ESSENCE: liberation on the dancefloor — survival, desire, celebration; simple mantra hooks made for repetition under lights",
+  "house": "LYRIC ESSENCE: sparse mantra phrases about freedom, unity, losing yourself in the music; a few words looped until they hypnotize",
+  "edm": "LYRIC ESSENCE: euphoric universals — tonight, alive, together, forever; short vowel-rich phrases that soar over the drop",
+  "synthwave": "LYRIC ESSENCE: neon nostalgia — midnight drives, chrome, lost futures; cool detached delivery, cinematic imagery over feeling words",
+  "lo-fi": "LYRIC ESSENCE: if any vocals, half-spoken fragments — rain, coffee, unfinished thoughts; diary scraps rather than full sentences",
+  "jazz": "LYRIC ESSENCE: wit and sophistication — Great American Songbook craft; extended metaphors carried through the whole lyric; rhymes land lightly, conversational elegance",
+  "blues": "LYRIC ESSENCE: AAB verse form — state the trouble, restate it, twist the payoff line; troubles named plainly: no money, gone lover, long road; dark humor inside the pain",
+  "gospel": "LYRIC ESSENCE: testimony arc from valley to mountaintop; direct address to the divine; repetition as worship, each pass bigger than the last",
+  "classical": "LYRIC ESSENCE: if texted, sacred or poetic formal language; long vowels placed for singing; imagery of nature, devotion, fate",
+  "orchestral": "LYRIC ESSENCE: usually wordless; if choir, latin-like syllables or grand universal themes of destiny and dawn",
+  "cinematic": "LYRIC ESSENCE: sparse and mythic if sung — rise, fall, home, war; every word must survive a trailer cut",
+  "ambient": "LYRIC ESSENCE: wordless or breath-like fragments; language dissolves into texture",
+  "folk": "LYRIC ESSENCE: first-person narrative with names, places, seasons; the story carries the moral, never stated outright; plainspoken words, deep waters",
+  "country": "LYRIC ESSENCE: three chords and the truth — concrete nouns (truck, porch, whiskey, hometown); a twist in the final chorus recontextualizes the whole song",
+  "punk": "LYRIC ESSENCE: anger with a target — systems, boredom, hypocrisy; blunt short lines, no metaphor padding; sarcasm as a weapon",
+  "metal": "LYRIC ESSENCE: mythic conflict — war, darkness, inner demons; archaic and epic vocabulary; imperative verbs that command armies",
+  "indie": "LYRIC ESSENCE: oblique specificity — odd concrete details that feel more true than clichés; bittersweet irony; understatement over declaration",
+  "reggae": "LYRIC ESSENCE: resistance and uplift — Babylon vs Zion imagery, one-love unity; patois cadence; message delivered easy, never preachy",
+  "latin": "LYRIC ESSENCE: cuerpo y corazón — dance as flirtation; direct sensual address; Spanish vowel rhymes made for melisma",
+  "bossa nova": "LYRIC ESSENCE: saudade — beauty tinged with melancholy; beach, sun, a passing beloved observed from afar; effortless understatement",
+  "city pop": "LYRIC ESSENCE: urban night romance — neon, coastline highways, summer's end; sophisticated adult longing, stylish not desperate; Japanese with occasional English catchphrases",
+  "mandopop": "LYRIC ESSENCE: 具象物件承載情感 (rain, station, old photo as emotional vessels); restraint in verse, one distilled truth in the chorus; 林夕/方文山-style craft — poetic imagery grounded in daily life, never abstract sentiment piled up",
+  "j-pop": "LYRIC ESSENCE: seasons as emotional clock — sakura for parting, summer for youth, snow for silence; second-person encouragement anthems; small everyday moments magnified",
+  "k-pop": "LYRIC ESSENCE: self-empowerment and devotion arcs; killing-part hook of 2-4 words repeated; strategic English phrases as memory anchors inside Korean lines",
+  "cantopop": "LYRIC ESSENCE: 敘事+哲理收尾 — story unfolds concretely, final lines lift to reflection (林夕/黃偉文 craft); 協音 perfection makes lines feel inevitable; urban HK detail",
+  "chinese style": "LYRIC ESSENCE: 詩詞意象系統 — ink, moon, plum blossom, jiangnan rain; classical allusion carried on modern melody (方文山-style 素顏韻腳); parallel phrase structures, four-character elegance"
+};
+
 // 每種歌詞語言:填詞工藝規則
 const LANG_KB = {
-  "mandarin":   "MANDARIN LYRICS: natural spoken Taiwanese-Mandarin phrasing, absolutely no translationese; coherent rhyme scheme (AABB or ABAB) using Mandarin rime families; mind the four tones — melody peaks should fall on syllables whose tone rises or stays high so the words sing naturally; concrete imagery (rain, streetlights, seasons) over abstract nouns; chorus hook of 6-9 characters, repeated verbatim.",
-  "cantonese":  "CANTONESE LYRICS: MUST follow 協音 (tone-melody matching) — Cantonese has 6+ tones and lyrics that ignore tone contour sound wrong when sung; use colloquial Hong Kong Cantonese vocabulary (唔/嘅/喺) or literary register consistently, never mix carelessly; rhyme on Cantonese finals; short punchy lines suit the language.",
+  "mandarin":   "MANDARIN LYRICS: natural spoken Taiwanese-Mandarin phrasing, absolutely no translationese; coherent rhyme scheme (AABB or ABAB) using Mandarin rime families; mind the four tones — melody peaks should fall on syllables whose tone rises or stays high so the words sing naturally; concrete imagery (rain, streetlights, seasons) over abstract nouns; chorus hook of 6-9 characters, repeated verbatim. PRONUNCIATION SAFETY: avoid 多音字 (polyphonic characters) in hook positions; if a character is commonly misread by AI vocals, substituting a same-pinyin character IS acceptable even with a different tone — in sung Mandarin the melody overrides lexical tone, so 盎/昂 sound identical when sung and context restores the meaning; parenthetical echoes of the hook tail create a duet feel.",
+  "cantonese":  "CANTONESE LYRICS: MUST follow 協音 (tone-melody matching) — Cantonese has 6+ tones and lyrics that ignore tone contour sound wrong when sung; use colloquial Hong Kong Cantonese vocabulary (唔/嘅/喺) or literary register consistently, never mix carelessly; rhyme on Cantonese finals; short punchy lines suit the language. PRONUNCIATION SAFETY: Cantonese is the OPPOSITE of Mandarin here — because 協音 means listeners reconstruct meaning from pitch, tone-altering substitutions break comprehension; if a character is misread, rephrase the line or use a substitute matching both sound AND tone.",
   "english":    "ENGLISH LYRICS: align lexical stress with strong beats; favor concrete verbs and sensory nouns; use internal rhyme and assonance, not only end-rhyme; conversational contractions (I'm, don't); chorus hook of 3-7 words, title appears in the hook.",
-  "japanese":   "JAPANESE LYRICS: mora-based phrasing — keep lines light, avoid cramming morae; natural particle placement; seasonal/scenic imagery (夏, 夜風, 桜) suits J-pop; a few English hook words acceptable in chorus if genre-appropriate; avoid direct-translation word order.",
+  "japanese":   "JAPANESE LYRICS: mora-based phrasing — keep lines light, avoid cramming morae; natural particle placement; seasonal/scenic imagery (夏, 夜風, 桜) suits J-pop; a few English hook words acceptable in chorus if genre-appropriate; avoid direct-translation word order. READING SAFETY: for kanji with ambiguous readings, write the word in kana instead so the AI vocal reads it correctly; always use English section tags (Verse/Chorus), never Aメロ/Bメロ.",
   "korean":     "KOREAN LYRICS: smooth batchim flow — avoid consonant-cluster pileups on fast passages; K-pop convention allows a short English hook line blended into Korean chorus; repetition of the killing-part hook; natural 해요체/반말 register matched to song mood.",
   "spanish":    "SPANISH LYRICS: vowel-rich end rhymes come naturally — vary with asonante rhyme; align stressed syllables (palabras llanas/agudas) with the beat; warm direct address (tú/contigo); imagery of light, sea, night suits Latin pop and bossa."
 };
@@ -143,6 +191,7 @@ function kbNotes(brief) {
     for (const g of genres) {
       const key = g === "mandopop" ? "mandopop" : g; // 前端傳英文名,直接對 key
       if (GENRE_KB[key]) out.push(key.toUpperCase() + " — " + GENRE_KB[key]);
+      if (GENRE_LYRIC_KB[key]) out.push(key.toUpperCase() + " " + GENRE_LYRIC_KB[key]);
     }
   }
   const lm = brief.match(/Lyrics language:\s*([^\n]*)/i);
@@ -177,7 +226,7 @@ app.post("/api/enhance", async (req, res) => {
     "Respond ONLY with raw JSON, no markdown fences, exactly: " +
     '{"style":"...","lyrics":"...","exclude":"...","title":"...","description":"..."} . ' +
     "style: comma-separated Suno style prompt, order genre->mood->instruments->vocals->production, " +
-    "15-30 descriptors, STRICTLY under 200 characters. " +
+    "rich and specific — target 250-450 characters, NEVER exceed 950 (Suno v5.5 style cap is 1000; only ancient v4 truncated at 200). Front-load genre, era and signature sounds since Suno weighs earliest tags most. " +
     "lyrics: complete original song lyrics written in the lyrics language given in the brief, " +
     "with structure tags [Intro][Verse 1][Pre-Chorus][Chorus][Verse 2][Bridge][Final Chorus][Outro], " +
     'conversational lines of 6-10 syllables, chorus hook repeated; if Instrumental is yes, return "[Instrumental]". ' +
